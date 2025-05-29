@@ -17,6 +17,8 @@ router.post('/local', authMiddleware, transferController.localTransfer);
 // International transfer (protected)
 router.post('/international', authMiddleware, transferController.internationalTransfer);
 
+router.get('/all', authMiddleware, transferController.getAllTransfers);
+
 // General transfer creation (protected)
 // router.post('/create', authMiddleware, transferController.createTransfer);
 

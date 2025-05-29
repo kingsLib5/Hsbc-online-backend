@@ -32,21 +32,21 @@ exports.localTransfer = async (req, res) => {
   try {
     const code = generateCode();
     const transfer = new Transfer({
-      recipientName,
-      recipientAccount,
-      recipientBank,
-      recipientRouting,
-      amount,
-      transferType,
-      transferDate,
-      reference,
-      securityPin,
-      email,
-      verificationCode: code,
-      isVerified: false,
-      status: 'PendingVerification',
-    });
-    await transfer.save();
+  recipientName,
+  recipientAccount,
+  recipientBank,
+  recipientRouting,
+  amount,
+  transferType,
+  transferDate,
+  reference,
+  securityPin,
+  email,
+  verificationCode: code,
+  isVerified: false,
+  status: 'PendingVerification', // <-- Set to PendingVerification
+});
+await transfer.save();
 
     // Send code to user's email
     await transporter.sendMail({
@@ -87,24 +87,21 @@ exports.internationalTransfer = async (req, res) => {
   try {
     const code = generateCode();
     const transfer = new Transfer({
-      recipientName,
-      recipientAccount,
-      recipientBank,
-      recipientSwift,
-      recipientIban,
-      recipientCountry,
-      amount,
-      currency,
-      transferType,
-      transferDate,
-      reference,
-      securityPin,
-      email,
-      verificationCode: code,
-      isVerified: false,
-      status: 'PendingVerification',
-    });
-    await transfer.save();
+  recipientName,
+  recipientAccount,
+  recipientBank,
+  recipientRouting,
+  amount,
+  transferType,
+  transferDate,
+  reference,
+  securityPin,
+  email,
+  verificationCode: code,
+  isVerified: false,
+  status: 'PendingVerification', // <-- Set to PendingVerification
+});
+await transfer.save();
 
     // Send code to user's email
     await transporter.sendMail({
@@ -135,14 +132,43 @@ exports.verifyTransfer = async (req, res) => {
     if (transfer.verificationCode !== code) {
       return res.status(401).json({ message: 'Invalid verification code.' });
     }
-    transfer.status = 'Approved';
+    transfer.status = 'Pending';
     transfer.isVerified = true;
     transfer.verificationCode = '';
     transfer.approvedAt = new Date();
     await transfer.save();
-    res.json({ message: 'Transfer approved!', transfer });
+    res.json({ message: 'Transfer pending!', transfer });
   } catch (error) {
     console.error('Error verifying transfer:', error);
     res.status(500).json({ message: 'Server error. Please try again later.', details: error.message });
+  }
+};
+
+// GET ALL TRANSFERS
+// GET ALL TRANSFERS
+// GET ALL TRANSFERS
+exports.getAllTransfers = async (req, res) => {
+  try {
+    // Debug: Log request method, url, headers, and body
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    console.log("Headers:", req.headers);
+    console.log("Body:", req.body);
+
+    // Debug: Log that we're fetching all transfers
+    console.log("DEBUG: Fetching ALL transfers (no user filter)");
+
+    const transfers = await Transfer.find().sort({ createdAt: -1 });
+
+    // Debug: Log the number of transfers found
+    console.log(`DEBUG: Found ${transfers.length} total transfers`);
+
+    res.json(transfers);
+  } catch (error) {
+    console.error('Error fetching transfers:', error);
+    res.status(500).json({ 
+      message: 'Server error. Please try again later.', 
+      details: error.message,
+      stack: error.stack // Add stack trace for debugging
+    });
   }
 };
