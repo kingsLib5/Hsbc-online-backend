@@ -20,8 +20,8 @@ async function autoSeedUser() {
       accounts: [
         {
           type: 'Savings Account',
-          number: '1002003001',
-          balance: 12000000,
+          number: '100********',
+          balance: 2650000,
         },
       ],
       role: 'user',

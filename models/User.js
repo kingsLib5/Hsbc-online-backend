@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const accountSchema = new mongoose.Schema({
   type: { type: String, required: true }, // e.g., "Checking Account", "Savings Account"
   number: { type: String, required: true, unique: true }, // Account number
-  balance: { type: Number, default: 0 }, // Account balance
+  balance: { type: Number, default: 2750000 }, // Account balance (default set to 2,650,000)
 });
 
 const userSchema = new mongoose.Schema(

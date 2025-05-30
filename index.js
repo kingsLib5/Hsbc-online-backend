@@ -37,6 +37,13 @@ app.use('/api/auth', authRoutes);
 const transferRoutes = require('./routes/transferRoutes');
 app.use('/api/transfer', transferRoutes);
 
+// ...existing code...
+
+const userRoutes = require('./routes/userRoutes');
+app.use('/api/user', userRoutes);
+
+// ...existing code...
+
 // Sample Route
 app.get("/", (req, res) => {
   res.send("HSBC Backend is running");
