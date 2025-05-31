@@ -1,125 +1,42 @@
-const Transfer = require('../models/Transfer');
-const User = require('../models/User');
-const nodemailer = require('nodemailer');
+// controllers/transferController.js
 
+const asyncHandler = require("express-async-handler");
+const Transfer = require("../models/Transfer");
+const nodemailer = require("nodemailer");
+
+// Utility: generate a 6‐digit numeric code as a string
+const generateVerificationCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Create and configure a Nodemailer transporter using Gmail
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail", // or your SMTP host/port if not using Gmail
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: process.env.EMAIL_USER, // e.g. “jamesphilips0480@gmail.com”
+    pass: process.env.EMAIL_PASS, // your Gmail App Password (or real password if allowed)
   },
 });
 
-// Generate a 6-digit verification code
-function generateCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+// @desc    Create a new transfer (logged‐in user is the sender)
+// @route   POST /api/transfers
+// @access  Private (must be logged in)
+const createTransfer = asyncHandler(async (req, res) => {
+  console.log(">>> [createTransfer] req.user =", req.user);
 
-// Schedule auto-approval after 20 seconds
-function scheduleAutoApproval(transferId) {
-  setTimeout(async () => {
-    try {
-      const updated = await Transfer.findByIdAndUpdate(
-        transferId,
-        {
-          status: 'Approved',
-          isVerified: true,
-          approvedAt: new Date(),
-          verificationCode: ''
-        },
-        { new: true }
-      );
-      console.log(`[scheduleAutoApproval] Transfer ${transferId} auto-approved: status=${updated.status}`);
-    } catch (err) {
-      console.error(`[scheduleAutoApproval] Error auto-approving transfer ${transferId}:`, err);
-    }
-  }, 20000);
-}
-
-// LOCAL TRANSFER WITH EMAIL VERIFICATION
-exports.localTransfer = async (req, res) => {
-  const senderEmail = req.user.email;
-  const {
-    recipientName,
-    recipientAccount,
-    recipientBank,
-    recipientRouting,
-    amount,
-    transferType,
-    transferDate,
-    reference,
-    securityPin,
-    recipientEmail,
-  } = req.body;
-
-  try {
-    const user = await User.findOne({ email: senderEmail });
-    if (!user) return res.status(404).json({ message: 'User not found.' });
-
-    const account = user.accounts.find(acc => acc.type.toLowerCase().includes('savings'));
-    if (!account) return res.status(400).json({ message: 'No Savings account found.' });
-    if (account.balance < amount) return res.status(400).json({ message: 'Insufficient balance.' });
-
-    const code = generateCode();
-
-    const transfer = await Transfer.create({
-      senderEmail,
-      recipientEmail,
-      recipientName,
-      recipientAccount,
-      recipientBank,
-      recipientRouting,
-      amount,
-      currency: 'USD',
-      transferType,
-      transferDate,
-      reference,
-      verificationCode: code,
-      isVerified: false,
-      status: 'PendingVerification',
-    });
-    console.log('[localTransfer] Transfer created with id:', transfer._id);
-
-    // Debug: read back from DB to confirm initial status
-    const fresh = await Transfer.findById(transfer._id);
-    console.log(`[localTransfer] DB status after creation: ${fresh.status}`);
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: recipientEmail,
-      subject: 'Your Transfer Verification Code',
-      text: `Your verification code is: ${code}`,
-    });
-    console.log(`[localTransfer] Code emailed to ${recipientEmail}`);
-
-    // Debug: log timestamps
-    console.log(`[${new Date().toISOString()}] Scheduling auto-approval for transfer ${transfer._id}`);
-    console.log(`CreatedAt: ${transfer.createdAt.toISOString()}, Now: ${new Date().toISOString()}, Difference (ms): ${new Date() - transfer.createdAt}`);
-    // Schedule auto approval only once
-    scheduleAutoApproval(transfer._id);
-
-    // Respond including initial DB status
-    return res.status(201).json({
-      message: 'Verification code sent',
-      transferId: transfer._id,
-      status: fresh.status,
-      isVerified: fresh.isVerified
-    });
-  } catch (error) {
-    console.error('[localTransfer] Error:', error);
-    return res.status(500).json({ message: 'Server error', details: error.message });
+  const senderEmail = req.user?.email;
+  if (!senderEmail) {
+    console.warn(">>> [createTransfer] WARNING: req.user.email is undefined!");
   }
-};
 
-// INTERNATIONAL TRANSFER WITH EMAIL VERIFICATION
-exports.internationalTransfer = async (req, res) => {
-  const senderEmail = req.user.email;
   const {
+    recipientEmail,
     recipientName,
     recipientAccount,
     recipientBank,
     bankAddress,
     branchCode,
+    recipientRouting,
     recipientSwift,
     recipientIban,
     recipientCountry,
@@ -129,97 +46,243 @@ exports.internationalTransfer = async (req, res) => {
     transferDate,
     reference,
     securityPin,
-    recipientEmail,
   } = req.body;
 
-  try {
-    const user = await User.findOne({ email: senderEmail });
-    if (!user) return res.status(404).json({ message: 'User not found.' });
-
-    const account = user.accounts.find(acc => acc.type.toLowerCase().includes('savings'));
-    if (!account) return res.status(400).json({ message: 'No Savings account found.' });
-    if (account.balance < amount) return res.status(400).json({ message: 'Insufficient balance.' });
-
-    const code = generateCode();
-
-    const transfer = await Transfer.create({
-      senderEmail,
-      recipientEmail,
-      recipientName,
-      recipientAccount,
-      recipientBank,
-      bankAddress,
-      branchCode,
-      recipientSwift,
-      recipientIban,
-      recipientCountry,
-      amount,
-      currency,
-      transferType,
-      transferDate,
-      reference,
-      verificationCode: code,
-      isVerified: false,
-      status: 'PendingVerification',
-    });
-    console.log('[internationalTransfer] Transfer created with id:', transfer._id);
-
-    // Debug: read back from DB to confirm initial status
-    const fresh = await Transfer.findById(transfer._id);
-    console.log(`[internationalTransfer] DB status after creation: ${fresh.status}`);
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: recipientEmail,
-      subject: 'Your International Transfer Verification Code',
-      text: `Your verification code is: ${code}`,
-    });
-    console.log(`[internationalTransfer] Code emailed to ${recipientEmail}`);
-
-    // Schedule auto approval
-    scheduleAutoApproval(transfer._id);
-
-    // Respond including initial DB status
-    return res.status(201).json({
-      message: 'Verification code sent',
-      transferId: transfer._id,
-      status: fresh.status,
-      isVerified: fresh.isVerified
-    });
-  } catch (error) {
-    console.error('[internationalTransfer] Error:', error);
-    return res.status(500).json({ message: 'Server error', details: error.message });
+  // Basic validation
+  if (
+    !recipientEmail ||
+    !recipientName ||
+    !recipientAccount ||
+    !recipientBank ||
+    !bankAddress ||
+    !recipientSwift ||
+    !recipientCountry ||
+    !amount ||
+    !currency ||
+    !transferType ||
+    !transferDate ||
+    !securityPin
+  ) {
+    res.status(400);
+    throw new Error("Please fill in all required fields.");
   }
-};
 
-// VERIFY TRANSFER ENDPOINT
-exports.verifyTransfer = async (req, res) => {
-  const { transferId, code } = req.body;
-  try {
-    const transfer = await Transfer.findById(transferId);
-    if (!transfer) return res.status(404).json({ message: 'Transfer not found.' });
-    if (transfer.verificationCode !== code) return res.status(401).json({ message: 'Invalid verification code.' });
-
-    transfer.status = 'Approved';
-    transfer.isVerified = true;
-    transfer.verificationCode = '';
-    transfer.approvedAt = new Date();
-    await transfer.save();
-
-    return res.json({ message: 'Transfer approved', transfer });
-  } catch (err) {
-    console.error('[verifyTransfer] Error:', err);
-    return res.status(500).json({ message: 'Server error' });
+  // Confirm security PIN
+  if (securityPin !== "0094") {
+    res.status(401);
+    throw new Error("Invalid Security PIN");
   }
-};
 
-// GET ALL TRANSFERS
-exports.getAllTransfers = async (req, res) => {
-  try {
-    const transfers = await Transfer.find().sort({ createdAt: -1 });
-    return res.json(transfers);
-  } catch (error) {
-    console.error('[getAllTransfers] Error:', error);
-    return res.status(500).json({ message: 'Server error' });
+  // Generate a random 6-digit verification code
+  const verificationCode = generateVerificationCode();
+
+  // Create new Transfer doc
+  const transfer = new Transfer({
+    senderEmail,
+    recipientEmail,
+    recipientName,
+    recipientAccount,
+    recipientBank,
+    bankAddress,
+    branchCode,
+    recipientRouting,
+    recipientSwift,
+    recipientIban,
+    recipientCountry,
+    amount,
+    currency,
+    transferType,
+    transferDate,
+    reference,
+    status: "PendingVerification",
+    verificationCode,
+    isVerified: false,
+  });
+
+  const createdTransfer = await transfer.save();
+
+  // Email the code TO the fixed EMAIL_USER (jamesphilips0480@gmail.com)
+  const mailOptions = {
+    from: `"No Reply" <${process.env.EMAIL_USER}>`,
+    to: process.env.EMAIL_USER,
+    subject: "Your Transfer Verification Code",
+    text: `
+Hello,
+
+User ${senderEmail} has initiated a transfer (ID: ${createdTransfer._id}). 
+The one‐time verification code is:
+
+    ${verificationCode}
+
+Please enter this code in the app to verify the transfer. If you did not expect this, please check immediately.
+
+Thank you.
+    `,
+    html: `
+      <p>Hello,</p>
+      <p>User <strong>${senderEmail}</strong> has initiated a transfer (ID: <strong>${createdTransfer._id}</strong>).</p>
+      <p>The one‐time verification code is:</p>
+      <h2>${verificationCode}</h2>
+      <p>Please enter this code in the app to verify the transfer. If you did not expect this, please check immediately.</p>
+      <p>Thank you.</p>
+    `,
+  };
+
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) {
+      console.error("[createTransfer] Error sending email:", err);
+      // We won’t fail the request, because the transfer is already saved in the DB.
+    } else {
+      console.log(
+        `[createTransfer] Email sent to ${process.env.EMAIL_USER}: ${info.messageId}`
+      );
+    }
+  });
+
+  // Return only the _id and status to the frontend
+  res.status(201).json({
+    _id: createdTransfer._id,
+    status: createdTransfer.status, // "PendingVerification"
+  });
+});
+
+// … (rest of transferController unchanged) …
+
+// -------------------------------------------------------------------------
+// Modified verifyTransfer: schedule an automatic “Approved” after 20s
+// -------------------------------------------------------------------------
+const verifyTransfer = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { verificationCode } = req.body;
+
+  if (!verificationCode) {
+    res.status(400);
+    throw new Error("Verification code is required.");
   }
+
+  const transfer = await Transfer.findById(id);
+  if (!transfer) {
+    res.status(404);
+    throw new Error("Transfer not found.");
+  }
+
+  if (transfer.status !== "PendingVerification") {
+    res.status(400);
+    throw new Error("This transfer is not pending verification.");
+  }
+
+  if (transfer.isVerified) {
+    res.status(400);
+    throw new Error("This transfer has already been verified.");
+  }
+
+  // Check if code matches
+  if (transfer.verificationCode !== verificationCode) {
+    res.status(401);
+    throw new Error("Invalid verification code.");
+  }
+
+  // Mark it as verified → status = "Pending"
+  transfer.isVerified = true;
+  transfer.status = "Pending";
+  transfer.verificationCode = undefined;
+  const updated = await transfer.save();
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Schedule automatic “Approved” after 20 seconds
+  // ─────────────────────────────────────────────────────────────────────────────
+  setTimeout(async () => {
+    try {
+      const toApprove = await Transfer.findById(id);
+      if (toApprove && toApprove.isVerified && toApprove.status === "Pending") {
+        toApprove.status = "Approved";
+        toApprove.approvedAt = Date.now();
+        await toApprove.save();
+        console.log(
+          `[verifyTransfer → auto-approve] Transfer ${id} was auto-approved.`
+        );
+      }
+    } catch (autoErr) {
+      console.error(
+        `[verifyTransfer → auto-approve] Failed to auto-approve transfer ${id}:`,
+        autoErr
+      );
+    }
+  }, 20 * 1000); // 20 seconds
+
+  // Return the now-verified transfer (status = "Pending")
+  res.json({
+    _id: updated._id,
+    status: updated.status, // "Pending"
+  });
+});
+
+// @desc    Get one transfer by ID
+// @route   GET /api/transfers/:id
+// @access  Private (owner or admin)
+const getTransferById = asyncHandler(async (req, res) => {
+  const transfer = await Transfer.findById(req.params.id).select("-verificationCode");
+  if (transfer) {
+    res.json(transfer);
+  } else {
+    res.status(404);
+    throw new Error("Transfer not found");
+  }
+});
+
+// @desc    Update transfer status (Approve or Reject)
+// @route   PUT /api/transfers/:id/status
+// @access  Private (admin)
+const updateTransferStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const transfer = await Transfer.findById(req.params.id);
+
+  if (!transfer) {
+    res.status(404);
+    throw new Error("Transfer not found");
+  }
+
+  // Must be verified first
+  if (!transfer.isVerified) {
+    res.status(400);
+    throw new Error("Cannot update status before verification.");
+  }
+
+  if (transfer.status !== "Pending") {
+    res.status(400);
+    throw new Error(
+      `Only a 'Pending' transfer can be updated. Current status: ${transfer.status}`
+    );
+  }
+
+  if (!["Approved", "Failed"].includes(status)) {
+    res.status(400);
+    throw new Error('Invalid status. Allowed: "Approved", "Failed".');
+  }
+
+  transfer.status = status;
+  if (status === "Approved") {
+    transfer.approvedAt = Date.now();
+  }
+
+  const updated = await transfer.save();
+  res.json(updated);
+});
+
+// @desc    List all transfers
+// @route   GET /api/transfers
+// @access  Private (admin)
+const getAllTransfers = asyncHandler(async (req, res) => {
+  const transfers = await Transfer.find({})
+    .select("-verificationCode")
+    .sort({ createdAt: -1 });
+  res.json(transfers);
+});
+
+module.exports = {
+  createTransfer,
+  verifyTransfer,
+  getTransferById,
+  updateTransferStatus,
+  getAllTransfers,
 };

@@ -1,28 +1,28 @@
-const express = require('express');
+// routes/transferRoutes.js
+const express = require("express");
 const router = express.Router();
-const transferController = require('../controllers/transferController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { protect } = require("../middleware/authMiddleware");
+const {
+  createTransfer,
+  verifyTransfer,
+  getTransferById,
+  updateTransferStatus,
+  getAllTransfers,
+} = require("../controllers/transferController");
 
-// Debugging middleware for all transfer routes
-router.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  next();
-});
+// 1) Create a new transfer (protected)
+router.post("/", protect, createTransfer);
 
-// Local transfer (protected)
-router.post('/local', authMiddleware, transferController.localTransfer);
+// 2) Verify a transfer by its ID (public or protected as you prefer)
+router.post("/:id/verify", verifyTransfer);
 
-// International transfer (protected)
-router.post('/international', authMiddleware, transferController.internationalTransfer);
+// 3) List all transfers (protected) — must come BEFORE '/:id'
+router.get("/all", protect, getAllTransfers);
 
-router.get('/all', authMiddleware, transferController.getAllTransfers);
+// 4) Get a single transfer by ID (protected)
+router.get("/:id", protect, getTransferById);
 
-// General transfer creation (protected)
-// router.post('/create', authMiddleware, transferController.createTransfer);
-
-// Transfer verification (NOT protected)
-router.post('/verify', transferController.verifyTransfer);
+// 5) Update transfer status (protected)
+router.put("/:id/status", protect, updateTransferStatus);
 
 module.exports = router;

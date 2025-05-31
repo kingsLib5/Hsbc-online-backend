@@ -5,6 +5,7 @@ const auth = require('../middleware/authMiddleware'); // Your JWT auth middlewar
 const authMiddleware = require('../middleware/authMiddleware');
 
 // Secure route to get user accounts
-router.get('/me', authMiddleware, userController.getUserAccounts);
+router.get('/me', authMiddleware.protect, userController.getUserAccounts);
+
 
 module.exports = router;

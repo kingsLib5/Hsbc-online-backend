@@ -35,7 +35,7 @@ const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
 const transferRoutes = require('./routes/transferRoutes');
-app.use('/api/transfer', transferRoutes);
+app.use('/api/transfers', transferRoutes);
 
 // ...existing code...
 
