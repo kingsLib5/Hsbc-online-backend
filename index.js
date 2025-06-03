@@ -42,6 +42,14 @@ app.use('/api/transfers', transferRoutes);
 const userRoutes = require('./routes/userRoutes');
 app.use('/api/user', userRoutes);
 
+const autoApproveTransfers = require("./jobs/autoApproveTransfers");
+autoApproveTransfers();
+
+const cronRoutes = require("./routes/cron");
+app.use("/cron", cronRoutes);
+
+
+
 // ...existing code...
 
 // Sample Route

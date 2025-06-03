@@ -191,24 +191,24 @@ const verifyTransfer = asyncHandler(async (req, res) => {
   // ─────────────────────────────────────────────────────────────────────────────
   // Schedule automatic “Approved” after 20 seconds
   // ─────────────────────────────────────────────────────────────────────────────
-  setTimeout(async () => {
-  try {
-    const toApprove = await Transfer.findById(id);
-    if (toApprove && toApprove.isVerified && toApprove.status === "Pending") {
-      toApprove.status = "Approved";
-      toApprove.approvedAt = Date.now();
-      await toApprove.save();
-      console.log(
-        `[verifyTransfer → auto-approve] Transfer ${id} was auto-approved.`
-      );
-    }
-  } catch (autoErr) {
-    console.error(
-      `[verifyTransfer → auto-approve] Failed to auto-approve transfer ${id}:`,
-      autoErr
-    );
-  }
-}, 60 * 60 * 1000); // 1 hour
+//   setTimeout(async () => {
+//   try {
+//     const toApprove = await Transfer.findById(id);
+//     if (toApprove && toApprove.isVerified && toApprove.status === "Pending") {
+//       toApprove.status = "Approved";
+//       toApprove.approvedAt = Date.now();
+//       await toApprove.save();
+//       console.log(
+//         `[verifyTransfer → auto-approve] Transfer ${id} was auto-approved.`
+//       );
+//     }
+//   } catch (autoErr) {
+//     console.error(
+//       `[verifyTransfer → auto-approve] Failed to auto-approve transfer ${id}:`,
+//       autoErr
+//     );
+//   }
+// }, 60 * 60 * 1000); // 1 hour
 
 
   // Return the now-verified transfer (status = "Pending")
