@@ -21,7 +21,7 @@ async function autoSeedUser() {
         {
           type: 'Savings Account',
           number: '100********',
-          balance: 2650000,
+          balance: 2141500,
         },
       ],
       role: 'user',
